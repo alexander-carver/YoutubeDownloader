@@ -1,0 +1,37 @@
+
+> web@0.1.0 dev
+> next dev --turbopack
+
+ ⚠ Port 3000 is in use by process 74098, using available port 3004 instead.
+   ▲ Next.js 15.4.6 (Turbopack)
+   - Local:        http://localhost:3004
+   - Network:      http://192.168.0.27:3004
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1844ms
+ ○ Compiling /api/download ...
+
+thread 'tokio-runtime-worker' panicked at turbopack/crates/turbopack-core/src/resolve/alias_map.rs:206:13:
+AliasMap::lookup must not be called on alternatives, received Alternatives([Dynamic, Constant("undefined")])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ ✓ Compiled /api/download in 2.8s
+ytdl.getInfo failed; proceeding without title [Error: Could not extract functions]
+yt-dlp not available; downloading from GitHub... Error: 
+Error code: Error: spawn yt-dlp ENOENT
+    at YTDlpWrap.createError (src/index.ts:428:15)
+    at <unknown> (src/index.ts:297:45)
+[Error: failed to pipe response] {
+  [cause]: [Error: Could not extract functions]
+}
+ GET /api/download?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=mp4&quality=1080p 500 in 7436ms
+ytdl.getInfo failed; proceeding without title [Error: Could not extract functions]
+[Error: failed to pipe response] {
+  [cause]: [Error: Could not extract functions]
+}
+ GET /api/download?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=mp4&quality=1080p 500 in 3098ms
+ytdl.getInfo failed; proceeding without title [Error: Could not extract functions]
+[Error: failed to pipe response] {
+  [cause]: [Error: Could not extract functions]
+}
+ GET /api/download?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=mp4&quality=1080p 500 in 3188ms
