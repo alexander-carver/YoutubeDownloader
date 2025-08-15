@@ -238,11 +238,21 @@ async function downloadWithYtdlCore(
       ffmpeg.setFfmpegPath(ffmpegPath);
     }
 
+    const toNodeReadable = (s: any): NodeReadable => {
+      try {
+        // If it's a Web ReadableStream, convert to Node stream
+        if (s && typeof s.getReader === "function" && (NodeReadable as any).fromWeb) {
+          return (NodeReadable as any).fromWeb(s);
+        }
+      } catch {}
+      return s as unknown as NodeReadable;
+    };
+
     if (req.format === "mp3") {
       const audio = ytdl(req.url, { quality: "highestaudio", filter: "audioonly" });
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
-          .input(audio as unknown as NodeJS.ReadableStream)
+          .input(toNodeReadable(audio) as unknown as any)
           .audioCodec("libmp3lame")
           .audioBitrate(320)
           .format("mp3")
@@ -280,8 +290,8 @@ async function downloadWithYtdlCore(
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
-        .addInput(videoStream as unknown as NodeJS.ReadableStream)
-        .addInput(audioStream as unknown as NodeJS.ReadableStream)
+        .addInput(toNodeReadable(videoStream) as unknown as any)
+        .addInput(toNodeReadable(audioStream) as unknown as any)
         .videoCodec("copy")
         .audioCodec("aac")
         .format("mp4")
@@ -311,7 +321,7 @@ export async function POST(request: Request): Promise<Response> {
     const ext = format === "mp3" ? "mp3" : "mp4";
     const tmpFilePath = await createTempFile(ext);
 
-    const { candidates, found } = getYtDlpPathOrCandidates();
+    const { candidates /* eslint-disable-line @typescript-eslint/no-unused-vars */, found } = getYtDlpPathOrCandidates();
     let ytDlp = found;
     if (!ytDlp) {
       // Try runtime download of yt-dlp; if that fails, fall back to ytdl-core+ffmpeg
