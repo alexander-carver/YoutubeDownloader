@@ -28,6 +28,7 @@ function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
   const locations = [
     cwd,
     serverlessRoot,
+    path.join(serverlessRoot, "var/task"),
     path.join(cwd, ".next"),
     path.join(cwd, ".next/standalone"),
     path.join(cwd, ".next/server"),

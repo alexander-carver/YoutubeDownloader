@@ -1,0 +1,14 @@
+{
+  "functions": {
+    // Include yt-dlp binary in app router API routes (e.g., /api/download)
+    "app/api/**/route.*": {
+      "runtime": "nodejs22.x",
+      "includeFiles": [
+        "yt-dlp-linux",
+        "yt-dlp"
+      ]
+    }
+  }
+}
+
+
