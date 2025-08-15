@@ -67,6 +67,42 @@ function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
   return { candidates };
 }
 
+async function downloadYtDlpToTmp(): Promise<string | undefined> {
+  try {
+    const isLinux = process.platform === "linux";
+    const url = isLinux
+      ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+      : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
+    const filename = isLinux ? "yt-dlp-linux" : "yt-dlp-macos";
+    const destDir = await fsp.mkdtemp(path.join(os.tmpdir(), "yt-dlp-"));
+    const destPath = path.join(destDir, filename);
+
+    const res = await fetch(url);
+    if (!res.ok || !res.body) {
+      throw new Error(`Failed to fetch yt-dlp: ${res.status} ${res.statusText}`);
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const file = fs.createWriteStream(destPath);
+      (res.body as unknown as NodeJS.ReadableStream)
+        .pipe(file)
+        .on("finish", resolve)
+        .on("error", reject);
+    });
+
+    await fsp.chmod(destPath, 0o755);
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[yt-dlp] Downloaded runtime binary to', destPath);
+    }
+    return destPath;
+  } catch (err) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[yt-dlp] Runtime download failed:', (err as Error).message);
+    }
+    return undefined;
+  }
+}
+
 function buildArgs(req: DownloadRequest, outputPath: string): string[] {
   const args: string[] = [
     req.url,
@@ -181,16 +217,22 @@ export async function POST(request: Request): Promise<Response> {
     const ext = format === "mp3" ? "mp3" : "mp4";
     const tmpFilePath = await createTempFile(ext);
 
-    const { found: ytDlp, candidates } = getYtDlpPathOrCandidates();
+    let { found: ytDlp, candidates } = getYtDlpPathOrCandidates();
     if (!ytDlp) {
-      await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
-      return Response.json(
-        {
-          error:
-            `yt-dlp binary not found. Tried: ${candidates.join(", ")}. Ensure postinstall fetched the correct binary and output tracing includes it.`,
-        },
-        { status: 500 }
-      );
+      // Fallback: download to tmp at runtime
+      const downloaded = await downloadYtDlpToTmp();
+      if (downloaded) {
+        ytDlp = downloaded;
+      } else {
+        await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
+        return Response.json(
+          {
+            error:
+              `yt-dlp binary not found. Tried: ${candidates.join(", ")}. Also failed to download at runtime.`,
+          },
+          { status: 500 }
+        );
+      }
     }
     const args = buildArgs({ url, format, quality }, tmpFilePath);
 
