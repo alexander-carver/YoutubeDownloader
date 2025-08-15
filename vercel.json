@@ -2,11 +2,11 @@
   "functions": {
     "app/**/route.js": {
       "runtime": "nodejs22.x",
-      "includeFiles": ["yt-dlp-linux", "yt-dlp"]
+      "includeFiles": "yt-dlp*"
     },
     "app/**/route.ts": {
       "runtime": "nodejs22.x",
-      "includeFiles": ["yt-dlp-linux", "yt-dlp"]
+      "includeFiles": "yt-dlp*"
     }
   }
 }
