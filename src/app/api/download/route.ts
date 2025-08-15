@@ -78,17 +78,13 @@ async function downloadYtDlpToTmp(): Promise<string | undefined> {
     const destPath = path.join(destDir, filename);
 
     const res = await fetch(url);
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       throw new Error(`Failed to fetch yt-dlp: ${res.status} ${res.statusText}`);
     }
 
-    await new Promise<void>((resolve, reject) => {
-      const file = fs.createWriteStream(destPath);
-      (res.body as unknown as NodeJS.ReadableStream)
-        .pipe(file)
-        .on("finish", resolve)
-        .on("error", reject);
-    });
+    // Some runtimes expose Web ReadableStream only; avoid piping and write the buffer directly
+    const arrayBuffer = await res.arrayBuffer();
+    await fsp.writeFile(destPath, Buffer.from(arrayBuffer));
 
     await fsp.chmod(destPath, 0o755);
     if (process.env.NODE_ENV === 'production') {
