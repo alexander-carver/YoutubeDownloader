@@ -70,27 +70,53 @@ function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
 async function downloadYtDlpToTmp(): Promise<string | undefined> {
   try {
     const isLinux = process.platform === "linux";
-    const url = isLinux
-      ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
-      : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
+    const linuxCandidates = [
+      // Try most compatible binaries first; names may vary between releases
+      "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp", // common standalone
+      "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux", // static linux variant
+      "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_x86_64",
+      "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp", // nightly
+      "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux",
+      "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_x86_64"
+    ];
+
+    const urlList = isLinux
+      ? linuxCandidates
+      : [
+          "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+        ];
+
     const filename = isLinux ? "yt-dlp-linux" : "yt-dlp-macos";
     const destDir = await fsp.mkdtemp(path.join(os.tmpdir(), "yt-dlp-"));
     const destPath = path.join(destDir, filename);
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch yt-dlp: ${res.status} ${res.statusText}`);
+    let lastError: string | undefined;
+    for (const candidateUrl of urlList) {
+      try {
+        const res = await fetch(candidateUrl);
+        if (!res.ok) {
+          lastError = `${res.status} ${res.statusText}`;
+          continue;
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        await fsp.writeFile(destPath, Buffer.from(arrayBuffer));
+        await fsp.chmod(destPath, 0o755);
+
+        // Smoke-test the binary to ensure it runs on this platform
+        const { code, stderr } = await spawnYtDlp(["--version"], destPath);
+        if (code === 0) {
+          if (process.env.NODE_ENV === 'production') {
+            console.log('[yt-dlp] Downloaded runtime binary to', destPath, 'from', candidateUrl);
+          }
+          return destPath;
+        }
+        lastError = stderr || `exit code ${code}`;
+      } catch (e) {
+        lastError = (e as Error).message;
+      }
     }
 
-    // Some runtimes expose Web ReadableStream only; avoid piping and write the buffer directly
-    const arrayBuffer = await res.arrayBuffer();
-    await fsp.writeFile(destPath, Buffer.from(arrayBuffer));
-
-    await fsp.chmod(destPath, 0o755);
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[yt-dlp] Downloaded runtime binary to', destPath);
-    }
-    return destPath;
+    throw new Error(`Tried multiple URLs for yt-dlp, last error: ${lastError}`);
   } catch (err) {
     if (process.env.NODE_ENV === 'production') {
       console.error('[yt-dlp] Runtime download failed:', (err as Error).message);
