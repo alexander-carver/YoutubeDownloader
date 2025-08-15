@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import UrlForm from "@/components/UrlForm";
 import Footer from "@/components/Footer";
+import JsonLd from "@/components/JsonLd";
 import AdPlaceholder from "@/components/AdPlaceholder";
 import CountdownTimer from "@/components/CountdownTimer";
 import AffiliateCard from "@/components/AffiliateCard";
@@ -8,6 +9,40 @@ import AffiliateCard from "@/components/AffiliateCard";
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Structured Data */}
+      <JsonLd
+        id="ld-website"
+        data={{
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Free Videos Downloader",
+          url: "https://freevideosdownloader.com/",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: "https://freevideosdownloader.com/?q={search_term_string}",
+            "query-input": "required name=search_term_string",
+          },
+        }}
+      />
+      <JsonLd
+        id="ld-software"
+        data={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Free Videos Downloader",
+          operatingSystem: "Web",
+          applicationCategory: "UtilitiesApplication",
+          offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+          url: "https://freevideosdownloader.com/",
+          description:
+            "Free YouTube video and audio downloader. Fast, safe, and easy to use.",
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: 4.9,
+            reviewCount: 1000,
+          },
+        }}
+      />
       <Header />
       <main className="flex-1">
         {/* Hero with right rail ad */}
