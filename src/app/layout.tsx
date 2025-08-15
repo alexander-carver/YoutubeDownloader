@@ -23,7 +23,16 @@ export const metadata: Metadata = {
     "video download",
     "audio download",
   ],
-  metadataBase: new URL("https://localhost"),
+  metadataBase: new URL("https://freevideosdownloader.com"),
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
 };
 
 export default function RootLayout({
