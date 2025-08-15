@@ -253,7 +253,7 @@ async function downloadWithYtdlCore(
       const audio = ytdl(req.url, { quality: "highestaudio", filter: "audioonly" });
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
-          .input(toNodeReadable(audio) as unknown as NodeJS.ReadableStream)
+          .input(toNodeReadable(audio) as unknown as NodeReadable)
           .audioCodec("libmp3lame")
           .audioBitrate(320)
           .format("mp3")
@@ -291,8 +291,8 @@ async function downloadWithYtdlCore(
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
-        .addInput(toNodeReadable(videoStream) as unknown as NodeJS.ReadableStream)
-        .addInput(toNodeReadable(audioStream) as unknown as NodeJS.ReadableStream)
+        .addInput(toNodeReadable(videoStream) as unknown as NodeReadable)
+        .addInput(toNodeReadable(audioStream) as unknown as NodeReadable)
         .videoCodec("copy")
         .audioCodec("aac")
         .format("mp4")
