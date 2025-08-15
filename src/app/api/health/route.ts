@@ -5,7 +5,27 @@ import path from 'node:path';
 export const runtime = "nodejs";
 
 export async function GET() {
-  const diagnostics: any = {
+  type YtDlpSearchItem = {
+    path: string;
+    exists: boolean;
+    size?: number;
+    isFile?: boolean;
+    mode?: string;
+    error?: string;
+  };
+
+  type Diagnostics = {
+    platform: string;
+    nodeVersion: string;
+    cwd: string;
+    dirname: string;
+    env: { NODE_ENV?: string; VERCEL?: string; VERCEL_ENV?: string };
+    ytDlpSearch: YtDlpSearchItem[];
+    filesInRoot: string[] | string;
+    filesInTask: string[] | string;
+  };
+
+  const diagnostics: Diagnostics = {
     platform: process.platform,
     nodeVersion: process.version,
     cwd: process.cwd(),
