@@ -71,7 +71,7 @@ async function downloadYtDlpToTmp(): Promise<string | undefined> {
   try {
     const isLinux = process.platform === "linux";
     const url = isLinux
-      ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+      ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
       : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
     const filename = isLinux ? "yt-dlp-linux" : "yt-dlp-macos";
     const destDir = await fsp.mkdtemp(path.join(os.tmpdir(), "yt-dlp-"));
