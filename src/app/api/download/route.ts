@@ -238,21 +238,22 @@ async function downloadWithYtdlCore(
       ffmpeg.setFfmpegPath(ffmpegPath);
     }
 
-    const toNodeReadable = (s: any): NodeReadable => {
+    const toNodeReadable = (stream: unknown): NodeReadable => {
       try {
-        // If it's a Web ReadableStream, convert to Node stream
-        if (s && typeof s.getReader === "function" && (NodeReadable as any).fromWeb) {
-          return (NodeReadable as any).fromWeb(s);
+        const maybeWeb = stream as { getReader?: () => unknown };
+        const readableFromWeb = (NodeReadable as unknown as { fromWeb?: (s: unknown) => NodeReadable }).fromWeb;
+        if (maybeWeb && typeof maybeWeb.getReader === "function" && typeof readableFromWeb === "function") {
+          return readableFromWeb(stream);
         }
       } catch {}
-      return s as unknown as NodeReadable;
+      return stream as NodeReadable;
     };
 
     if (req.format === "mp3") {
       const audio = ytdl(req.url, { quality: "highestaudio", filter: "audioonly" });
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
-          .input(toNodeReadable(audio) as unknown as any)
+          .input(toNodeReadable(audio) as unknown as NodeJS.ReadableStream)
           .audioCodec("libmp3lame")
           .audioBitrate(320)
           .format("mp3")
@@ -290,8 +291,8 @@ async function downloadWithYtdlCore(
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
-        .addInput(toNodeReadable(videoStream) as unknown as any)
-        .addInput(toNodeReadable(audioStream) as unknown as any)
+        .addInput(toNodeReadable(videoStream) as unknown as NodeJS.ReadableStream)
+        .addInput(toNodeReadable(audioStream) as unknown as NodeJS.ReadableStream)
         .videoCodec("copy")
         .audioCodec("aac")
         .format("mp4")
