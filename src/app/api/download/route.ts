@@ -25,14 +25,18 @@ function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
       ? ["yt-dlp-macos", "yt-dlp"]
       : ["yt-dlp"];
 
+  // In Vercel deployment, __dirname will be /var/task/.next/server/app/api/download
+  // The binary should be at /var/task/yt-dlp-linux due to includeFiles in vercel.json
   const locations = [
-    cwd,
-    serverlessRoot,
-    path.join(serverlessRoot, "var/task"),
+    serverlessRoot, // /var/task - Primary location for Vercel
+    cwd, // process.cwd() - for local development
+    path.join(cwd, "web"), // In case cwd is parent directory
+    path.join(serverlessRoot, ".next/server/app/api/download"), // API route location
     path.join(cwd, ".next"),
     path.join(cwd, ".next/standalone"),
     path.join(cwd, ".next/server"),
     path.dirname(new URL(import.meta.url).pathname || ""),
+    __dirname, // Current directory of this file
   ];
 
   const candidates: string[] = [];
@@ -42,10 +46,22 @@ function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
     }
   }
 
+  // Log for debugging in production
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[yt-dlp] Looking for binary in:', candidates.slice(0, 5));
+    console.log('[yt-dlp] Current directory:', __dirname);
+    console.log('[yt-dlp] Process cwd:', process.cwd());
+  }
+
   for (const p of candidates) {
     try {
       const stat = fs.statSync(p);
-      if (stat.isFile()) return { found: p, candidates };
+      if (stat.isFile()) {
+        if (process.env.NODE_ENV === 'production') {
+          console.log('[yt-dlp] Found binary at:', p);
+        }
+        return { found: p, candidates };
+      }
     } catch {}
   }
   return { candidates };

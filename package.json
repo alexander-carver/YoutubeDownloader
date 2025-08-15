@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "prebuild": "set -e; OS=\"$(uname)\"; if [ \"$OS\" = \"Linux\" ]; then BIN=yt-dlp-linux; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp; else BIN=yt-dlp-macos; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos; fi; echo Fetching $BIN...; curl -L -f \"$URL\" -o \"$BIN\" && chmod +x \"$BIN\" && mkdir -p src/app/api/download && cp \"$BIN\" src/app/api/download/",
+    "vercel-build": "if [ \"$(uname)\" = \"Linux\" ]; then echo 'Downloading yt-dlp for Linux...'; curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-linux && chmod +x yt-dlp-linux && ls -la yt-dlp-linux; fi && npm run build",
+    "prebuild": "set -e; OS=\"$(uname)\"; if [ \"$OS\" = \"Linux\" ]; then BIN=yt-dlp-linux; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp; else BIN=yt-dlp-macos; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos; fi; echo Fetching $BIN...; curl -L -f \"$URL\" -o \"$BIN\" && chmod +x \"$BIN\"",
     "start": "next start",
     "lint": "next lint",
     "figma:export": "tsx figma/export-assets.ts",

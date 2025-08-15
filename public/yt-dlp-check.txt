@@ -1,0 +1,2 @@
+This file verifies yt-dlp deployment setup.
+The binary should be included via vercel.json includeFiles directive.

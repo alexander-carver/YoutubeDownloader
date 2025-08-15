@@ -1,0 +1,9 @@
+{
+  "functions": {
+    "src/app/api/download/route.ts": {
+      "includeFiles": "yt-dlp-linux",
+      "maxDuration": 300
+    }
+  },
+  "outputFileTracing": true
+}
