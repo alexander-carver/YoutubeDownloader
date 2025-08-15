@@ -249,8 +249,18 @@ async function downloadWithYtdlCore(
       return stream as NodeReadable;
     };
 
+    const requestHeaders = {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "accept-language": "en-US,en;q=0.9",
+    } as const;
+
     if (req.format === "mp3") {
-      const audio = ytdl(req.url, { quality: "highestaudio", filter: "audioonly" });
+      const audio = ytdl(req.url, {
+        quality: "highestaudio",
+        filter: "audioonly",
+        requestOptions: { headers: requestHeaders },
+      });
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
           .input(toNodeReadable(audio) as unknown as NodeReadable)
@@ -265,13 +275,32 @@ async function downloadWithYtdlCore(
       return { ok: true };
     }
 
-    // MP4 path: pick best AVC video + best M4A audio and mux
-    const info = await ytdl.getInfo(req.url);
+    // MP4 path
+    const info = await ytdl.getInfo(req.url, { requestOptions: { headers: requestHeaders } });
 
     const toHeight = (q: DownloadRequest["quality"]) =>
       q === "1080p" ? 1080 : q === "720p" ? 720 : q === "480p" ? 480 : Infinity;
 
     const maxH = toHeight(req.quality ?? "auto");
+    // First try a progressive MP4 (audio+video) to avoid muxing/transcoding
+    const progressive = ytdl.chooseFormat(
+      info.formats.filter((f) => f.hasAudio && f.hasVideo && f.container === "mp4" && (f.height ? f.height <= maxH : true)),
+      { quality: "highest" }
+    );
+
+    if (progressive && progressive.url) {
+      const av = ytdl.downloadFromInfo(info, { format: progressive, requestOptions: { headers: requestHeaders } });
+      await new Promise<void>((resolve, reject) => {
+        const file = fs.createWriteStream(outputPath);
+        (toNodeReadable(av) as unknown as NodeReadable)
+          .pipe(file)
+          .on("finish", () => resolve())
+          .on("error", (err) => reject(err));
+      });
+      return { ok: true };
+    }
+
+    // Fallback: mux best H264 video + best MP4 audio with ffmpeg
     const videoFormat = ytdl.chooseFormat(
       info.formats
         .filter((f) => f.hasVideo && !f.hasAudio)
@@ -286,8 +315,8 @@ async function downloadWithYtdlCore(
       { quality: "highestaudio" }
     );
 
-    const videoStream = ytdl.downloadFromInfo(info, { format: videoFormat });
-    const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat });
+    const videoStream = ytdl.downloadFromInfo(info, { format: videoFormat, requestOptions: { headers: requestHeaders } });
+    const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat, requestOptions: { headers: requestHeaders } });
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
