@@ -217,7 +217,8 @@ export async function POST(request: Request): Promise<Response> {
     const ext = format === "mp3" ? "mp3" : "mp4";
     const tmpFilePath = await createTempFile(ext);
 
-    let { found: ytDlp, candidates } = getYtDlpPathOrCandidates();
+    const { candidates, found } = getYtDlpPathOrCandidates();
+    let ytDlp = found;
     if (!ytDlp) {
       // Fallback: download to tmp at runtime
       const downloaded = await downloadYtDlpToTmp();
