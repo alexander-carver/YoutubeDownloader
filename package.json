@@ -5,11 +5,11 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "prebuild": "set -e; OS=\"$(uname)\"; if [ \"$OS\" = \"Linux\" ]; then BIN=yt-dlp-linux; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp; else BIN=yt-dlp-macos; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos; fi; echo Fetching $BIN...; curl -L -f \"$URL\" -o \"$BIN\" && chmod +x \"$BIN\" && mkdir -p src/app/api/download && cp \"$BIN\" src/app/api/download/",
     "start": "next start",
     "lint": "next lint",
     "figma:export": "tsx figma/export-assets.ts",
-    "postinstall": "if [ \"$(uname)\" = \"Linux\" ]; then curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-linux && chmod +x yt-dlp-linux; else curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o yt-dlp-macos && chmod +x yt-dlp-macos; fi",
-    "prebuild": "set -e; if [ \"Darwin\" = \"Linux\" ]; then BIN=yt-dlp-linux; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp; else BIN=yt-dlp-macos; URL=https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos; fi; echo Fetching ...; curl -L -f \"\" -o \"\" && chmod +x \"\" && mkdir -p src/app/api/download && cp \"\" src/app/api/download/"
+    "postinstall": "if [ \"$(uname)\" = \"Linux\" ]; then curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-linux && chmod +x yt-dlp-linux; else curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o yt-dlp-macos && chmod +x yt-dlp-macos; fi"
   },
   "dependencies": {
     "@vercel/analytics": "^1.3.1",
