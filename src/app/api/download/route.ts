@@ -15,25 +15,39 @@ type DownloadRequest = {
   quality?: "auto" | "1080p" | "720p" | "480p";
 };
 
-function getYtDlpPath(): string {
-  // Prefer a platform-specific bundled binary at project root.
+function getYtDlpPathOrCandidates(): { found?: string; candidates: string[] } {
+  // Prefer a platform-specific bundled binary at project root or serverless root.
   const cwd = process.cwd();
+  const serverlessRoot = "/var/task"; // common on AWS/Vercel
+  const names = process.platform === "linux"
+    ? ["yt-dlp-linux", "yt-dlp"]
+    : process.platform === "darwin"
+      ? ["yt-dlp-macos", "yt-dlp"]
+      : ["yt-dlp"];
+
+  const locations = [
+    cwd,
+    serverlessRoot,
+    path.join(cwd, ".next"),
+    path.join(cwd, ".next/standalone"),
+    path.join(cwd, ".next/server"),
+    path.dirname(new URL(import.meta.url).pathname || ""),
+  ];
+
   const candidates: string[] = [];
-  if (process.platform === "linux") {
-    candidates.push(path.join(cwd, "yt-dlp-linux"));
-  } else if (process.platform === "darwin") {
-    candidates.push(path.join(cwd, "yt-dlp-macos"));
+  for (const dir of locations) {
+    for (const name of names) {
+      candidates.push(path.join(dir, name));
+    }
   }
-  // Legacy single-binary name
-  candidates.push(path.join(cwd, "yt-dlp"));
 
   for (const p of candidates) {
     try {
       const stat = fs.statSync(p);
-      if (stat.isFile()) return p;
+      if (stat.isFile()) return { found: p, candidates };
     } catch {}
   }
-  return "yt-dlp"; // rely on system PATH (may not work on some hosts)
+  return { candidates };
 }
 
 function buildArgs(req: DownloadRequest, outputPath: string): string[] {
@@ -150,7 +164,17 @@ export async function POST(request: Request): Promise<Response> {
     const ext = format === "mp3" ? "mp3" : "mp4";
     const tmpFilePath = await createTempFile(ext);
 
-    const ytDlp = getYtDlpPath();
+    const { found: ytDlp, candidates } = getYtDlpPathOrCandidates();
+    if (!ytDlp) {
+      await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
+      return Response.json(
+        {
+          error:
+            `yt-dlp binary not found. Tried: ${candidates.join(", ")}. Ensure postinstall fetched the correct binary and output tracing includes it.`,
+        },
+        { status: 500 }
+      );
+    }
     const args = buildArgs({ url, format, quality }, tmpFilePath);
 
     // Ensure parent dir exists (mkdtemp already did)
