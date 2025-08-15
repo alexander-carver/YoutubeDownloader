@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { Readable as NodeReadable } from "node:stream";
 import { promises as fsp } from "node:fs";
 import fs from "node:fs";
 import path from "node:path";
@@ -43,20 +44,26 @@ function buildArgs(req: DownloadRequest, outputPath: string): string[] {
   if (req.format === "mp3") {
     args.push(
       "-f",
+      // Prefer best audio; extraction will convert to mp3
       "bestaudio/bestaudio*",
       "-x",
       "--audio-format",
-      "mp3"
+      "mp3",
+      "--audio-quality",
+      "0" // best
     );
   } else {
     // mp4
     const quality = req.quality ?? "auto";
+    // Prefer MP4/H264 + M4A to ensure compatibility with MP4 container without transcoding
     if (quality === "1080p") {
-      args.push("-f", "bv*[height<=1080]+ba/b[height<=1080]");
+      args.push("-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b");
     } else if (quality === "720p") {
-      args.push("-f", "bv*[height<=720]+ba/b[height<=720]");
+      args.push("-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[ext=mp4]/b");
     } else if (quality === "480p") {
-      args.push("-f", "bv*[height<=480]+ba/b[height<=480]");
+      args.push("-f", "bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480][ext=mp4]/b[ext=mp4]/b");
+    } else {
+      args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b");
     }
     args.push("--merge-output-format", "mp4");
   }
@@ -83,16 +90,40 @@ async function streamFileAndCleanup(filePath: string, downloadName: string): Pro
     fsp.rm(path.dirname(filePath), { recursive: true, force: true }).catch(() => {});
   });
 
-  return new Response(stream as unknown as ReadableStream, { headers });
+  // Convert Node.js Readable stream to Web ReadableStream (required by Next.js Response)
+  const webStream = NodeReadable.toWeb(stream) as unknown as ReadableStream;
+  return new Response(webStream, { headers });
 }
 
 function spawnYtDlp(args: string[], binary: string): Promise<{ code: number; stderr: string }>
 {
   return new Promise((resolve) => {
+    let resolved = false;
     const proc = spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
     proc.stderr.on("data", (d) => (stderr += String(d)));
-    proc.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+    proc.on("error", (err) => {
+      if (resolved) return;
+      resolved = true;
+      const msg = `${err.name}: ${err.message}`;
+      resolve({ code: 1, stderr: msg });
+    });
+    proc.on("close", (code) => {
+      if (resolved) return;
+      resolved = true;
+      resolve({ code: code ?? 1, stderr });
+    });
+
+    // Safety timeout to avoid hanging requests
+    const timeoutMs = 240_000; // 4 minutes
+    setTimeout(() => {
+      if (resolved) return;
+      try {
+        proc.kill("SIGKILL");
+      } catch {}
+      resolved = true;
+      resolve({ code: 1, stderr: `Timed out after ${timeoutMs / 1000}s` });
+    }, timeoutMs).unref();
   });
 }
 

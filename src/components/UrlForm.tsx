@@ -51,6 +51,9 @@ export default function UrlForm() {
       a.click();
       a.remove();
       URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Download failed";
+      alert(message);
     } finally {
       setLoading(false);
     }
