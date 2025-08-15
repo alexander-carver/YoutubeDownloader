@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import ffmpegPath from "ffmpeg-static";
+import ffmpeg from "fluent-ffmpeg";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -225,6 +226,77 @@ function spawnYtDlp(args: string[], binary: string): Promise<{ code: number; std
   });
 }
 
+async function downloadWithYtdlCore(
+  req: DownloadRequest,
+  outputPath: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ytdl = (await import("ytdl-core")).default;
+
+    // Ensure ffmpeg points to the static binary
+    if (ffmpegPath) {
+      ffmpeg.setFfmpegPath(ffmpegPath);
+    }
+
+    if (req.format === "mp3") {
+      const audio = ytdl(req.url, { quality: "highestaudio", filter: "audioonly" });
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg()
+          .input(audio as unknown as NodeJS.ReadableStream)
+          .audioCodec("libmp3lame")
+          .audioBitrate(320)
+          .format("mp3")
+          .output(outputPath)
+          .on("end", () => resolve())
+          .on("error", (err) => reject(err))
+          .run();
+      });
+      return { ok: true };
+    }
+
+    // MP4 path: pick best AVC video + best M4A audio and mux
+    const info = await ytdl.getInfo(req.url);
+
+    const toHeight = (q: DownloadRequest["quality"]) =>
+      q === "1080p" ? 1080 : q === "720p" ? 720 : q === "480p" ? 480 : Infinity;
+
+    const maxH = toHeight(req.quality ?? "auto");
+    const videoFormat = ytdl.chooseFormat(
+      info.formats
+        .filter((f) => f.hasVideo && !f.hasAudio)
+        .filter((f) => (f.height ? f.height <= maxH : true))
+        .filter((f) => (f.codecs ? f.codecs.includes("avc1") || f.codecs.includes("h264") : true))
+        .filter((f) => f.container === "mp4" || f.container === "mp4_dash"),
+      { quality: "highestvideo" }
+    );
+
+    const audioFormat = ytdl.chooseFormat(
+      info.formats.filter((f) => f.hasAudio && !f.hasVideo && (f.container === "m4a" || f.container === "mp4")),
+      { quality: "highestaudio" }
+    );
+
+    const videoStream = ytdl.downloadFromInfo(info, { format: videoFormat });
+    const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat });
+
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg()
+        .addInput(videoStream as unknown as NodeJS.ReadableStream)
+        .addInput(audioStream as unknown as NodeJS.ReadableStream)
+        .videoCodec("copy")
+        .audioCodec("aac")
+        .format("mp4")
+        .outputOptions(["-movflags +faststart"]) // better streaming compatibility
+        .save(outputPath)
+        .on("end", () => resolve())
+        .on("error", (err) => reject(err));
+    });
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "ytdl-core fallback failed";
+    return { ok: false, error: msg };
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = (await request.json()) as Partial<DownloadRequest>;
@@ -242,31 +314,37 @@ export async function POST(request: Request): Promise<Response> {
     const { candidates, found } = getYtDlpPathOrCandidates();
     let ytDlp = found;
     if (!ytDlp) {
-      // Fallback: download to tmp at runtime
+      // Try runtime download of yt-dlp; if that fails, fall back to ytdl-core+ffmpeg
       const downloaded = await downloadYtDlpToTmp();
       if (downloaded) {
         ytDlp = downloaded;
       } else {
-        await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
-        return Response.json(
-          {
-            error:
-              `yt-dlp binary not found. Tried: ${candidates.join(", ")}. Also failed to download at runtime.`,
-          },
-          { status: 500 }
-        );
+        const fallback = await downloadWithYtdlCore({ url, format, quality }, tmpFilePath);
+        if (!fallback.ok) {
+          await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
+          return Response.json(
+            { error: `yt-dlp unavailable and Node fallback failed: ${fallback.error}` },
+            { status: 500 }
+          );
+        }
+        const baseName = `youtube-download.${ext}`;
+        return await streamFileAndCleanup(tmpFilePath, baseName);
       }
     }
     const args = buildArgs({ url, format, quality }, tmpFilePath);
 
-    // Ensure parent dir exists (mkdtemp already did)
     // Run yt-dlp
     const { code, stderr } = await spawnYtDlp(args, ytDlp);
     if (code !== 0) {
-      // Cleanup
-      await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
-      const message = stderr || "Download failed";
-      return Response.json({ error: message }, { status: 500 });
+      // If yt-dlp failed (e.g., incompatible), try Node fallback before giving up
+      const fallback = await downloadWithYtdlCore({ url, format, quality }, tmpFilePath);
+      if (!fallback.ok) {
+        await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
+        const message = stderr || fallback.error || "Download failed";
+        return Response.json({ error: message }, { status: 500 });
+      }
+      const baseName = `youtube-download.${ext}`;
+      return await streamFileAndCleanup(tmpFilePath, baseName);
     }
 
     // Derive a sane download filename
