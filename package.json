@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "figma:export": "tsx figma/export-assets.ts",
-    "postinstall": "if [ \"$(uname)\" = \"Linux\" ]; then curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp && chmod +x yt-dlp; fi"
+    "postinstall": "if [ \"$(uname)\" = \"Linux\" ]; then curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp-linux && chmod +x yt-dlp-linux; else curl -L -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o yt-dlp-macos && chmod +x yt-dlp-macos; fi"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0",

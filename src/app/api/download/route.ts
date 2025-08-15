@@ -16,15 +16,24 @@ type DownloadRequest = {
 };
 
 function getYtDlpPath(): string {
-  // Prefer a bundled binary at project root (macOS/Linux), fallback to PATH
-  const localBinary = path.join(process.cwd(), "yt-dlp");
-  try {
-    const stat = fs.statSync(localBinary);
-    if (stat.isFile()) {
-      return localBinary;
-    }
-  } catch {}
-  return "yt-dlp"; // rely on system PATH
+  // Prefer a platform-specific bundled binary at project root.
+  const cwd = process.cwd();
+  const candidates: string[] = [];
+  if (process.platform === "linux") {
+    candidates.push(path.join(cwd, "yt-dlp-linux"));
+  } else if (process.platform === "darwin") {
+    candidates.push(path.join(cwd, "yt-dlp-macos"));
+  }
+  // Legacy single-binary name
+  candidates.push(path.join(cwd, "yt-dlp"));
+
+  for (const p of candidates) {
+    try {
+      const stat = fs.statSync(p);
+      if (stat.isFile()) return p;
+    } catch {}
+  }
+  return "yt-dlp"; // rely on system PATH (may not work on some hosts)
 }
 
 function buildArgs(req: DownloadRequest, outputPath: string): string[] {
