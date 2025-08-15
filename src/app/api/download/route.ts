@@ -277,12 +277,12 @@ async function downloadWithYtdlCore(
         .filter((f) => f.hasVideo && !f.hasAudio)
         .filter((f) => (f.height ? f.height <= maxH : true))
         .filter((f) => (f.codecs ? f.codecs.includes("avc1") || f.codecs.includes("h264") : true))
-        .filter((f) => f.container === "mp4" || f.container === "mp4_dash"),
+        .filter((f) => f.container === "mp4"),
       { quality: "highestvideo" }
     );
 
     const audioFormat = ytdl.chooseFormat(
-      info.formats.filter((f) => f.hasAudio && !f.hasVideo && (f.container === "m4a" || f.container === "mp4")),
+      info.formats.filter((f) => f.hasAudio && !f.hasVideo && f.container === "mp4"),
       { quality: "highestaudio" }
     );
 
