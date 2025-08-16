@@ -369,7 +369,8 @@ export async function POST(request: Request): Promise<Response> {
         const fallback = await downloadWithYtdlCore({ url, format, quality }, tmpFilePath);
         if (!fallback.ok) {
           await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
-          const hint = cookieHeader
+          const hasCookieEnv = (process.env.YTDL_COOKIE || "").trim().length > 0;
+          const hint = hasCookieEnv
             ? ""
             : " Set env var YTDL_COOKIE with your youtube.com cookie string to bypass YouTube bot checks.";
           return Response.json({ error: `yt-dlp unavailable and Node fallback failed: ${fallback.error}.${hint}` }, { status: 500 });
