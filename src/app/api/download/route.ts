@@ -249,11 +249,18 @@ async function downloadWithYtdlCore(
       return stream as NodeReadable;
     };
 
+    const cookieHeader = (process.env.YTDL_COOKIE || "").trim();
     const requestHeaders: Record<string, string> = {
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "accept-language": "en-US,en;q=0.9",
+      referer: "https://www.youtube.com/",
+      origin: "https://www.youtube.com",
     } as const;
+
+    if (cookieHeader) {
+      (requestHeaders as Record<string, string>).cookie = cookieHeader;
+    }
 
     if (req.format === "mp3") {
       const audio = ytdl(req.url, {
@@ -362,10 +369,10 @@ export async function POST(request: Request): Promise<Response> {
         const fallback = await downloadWithYtdlCore({ url, format, quality }, tmpFilePath);
         if (!fallback.ok) {
           await fsp.rm(path.dirname(tmpFilePath), { recursive: true, force: true }).catch(() => {});
-          return Response.json(
-            { error: `yt-dlp unavailable and Node fallback failed: ${fallback.error}` },
-            { status: 500 }
-          );
+          const hint = cookieHeader
+            ? ""
+            : " Set env var YTDL_COOKIE with your youtube.com cookie string to bypass YouTube bot checks.";
+          return Response.json({ error: `yt-dlp unavailable and Node fallback failed: ${fallback.error}.${hint}` }, { status: 500 });
         }
         const baseName = `youtube-download.${ext}`;
         return await streamFileAndCleanup(tmpFilePath, baseName);
