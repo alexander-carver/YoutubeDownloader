@@ -231,7 +231,7 @@ async function downloadWithYtdlCore(
   outputPath: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const ytdl = (await import("ytdl-core")).default;
+    const ytdl = (await import("@distube/ytdl-core")).default;
 
     // Ensure ffmpeg points to the static binary
     if (ffmpegPath) {
@@ -249,7 +249,7 @@ async function downloadWithYtdlCore(
       return stream as NodeReadable;
     };
 
-    const requestHeaders = {
+    const requestHeaders: Record<string, string> = {
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "accept-language": "en-US,en;q=0.9",

@@ -21,7 +21,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "yt-dlp-wrap": "^2.3.12",
-    "ytdl-core": "^4.11.5"
+    "@distube/ytdl-core": "^4.15.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
