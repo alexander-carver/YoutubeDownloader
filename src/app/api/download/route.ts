@@ -250,6 +250,21 @@ async function downloadWithYtdlCore(
     };
 
     const cookieHeader = (process.env.YTDL_COOKIE || "").trim();
+    const parseCookieHeaderToArray = (header: string): Array<{ name: string; value: string; domain: string; path: string }> => {
+      if (!header) return [];
+      return header
+        .split(/;\s*/)
+        .map((kv) => {
+          const eq = kv.indexOf("=");
+          if (eq === -1) return null;
+          const name = kv.slice(0, eq).trim();
+          const value = kv.slice(eq + 1).trim();
+          if (!name) return null;
+          return { name, value, domain: ".youtube.com", path: "/" };
+        })
+        .filter((c): c is { name: string; value: string; domain: string; path: string } => Boolean(c));
+    };
+    const cookiesArr = parseCookieHeaderToArray(cookieHeader);
     const requestHeaders: Record<string, string> = {
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -262,11 +277,17 @@ async function downloadWithYtdlCore(
       (requestHeaders as Record<string, string>).cookie = cookieHeader;
     }
 
+    const commonOpts = {
+      requestOptions: { headers: requestHeaders },
+      // @distube/ytdl-core new cookies format
+      cookies: cookiesArr.length ? cookiesArr : undefined,
+    } as const;
+
     if (req.format === "mp3") {
       const audio = ytdl(req.url, {
         quality: "highestaudio",
         filter: "audioonly",
-        requestOptions: { headers: requestHeaders },
+        ...commonOpts,
       });
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
@@ -283,7 +304,7 @@ async function downloadWithYtdlCore(
     }
 
     // MP4 path
-    const info = await ytdl.getInfo(req.url, { requestOptions: { headers: requestHeaders } });
+    const info = await ytdl.getInfo(req.url, { ...commonOpts });
 
     const toHeight = (q: DownloadRequest["quality"]) =>
       q === "1080p" ? 1080 : q === "720p" ? 720 : q === "480p" ? 480 : Infinity;
@@ -296,7 +317,7 @@ async function downloadWithYtdlCore(
     );
 
     if (progressive && progressive.url) {
-      const av = ytdl.downloadFromInfo(info, { format: progressive, requestOptions: { headers: requestHeaders } });
+      const av = ytdl.downloadFromInfo(info, { format: progressive, ...commonOpts });
       await new Promise<void>((resolve, reject) => {
         const file = fs.createWriteStream(outputPath);
         (toNodeReadable(av) as unknown as NodeReadable)
@@ -322,8 +343,8 @@ async function downloadWithYtdlCore(
       { quality: "highestaudio" }
     );
 
-    const videoStream = ytdl.downloadFromInfo(info, { format: videoFormat, requestOptions: { headers: requestHeaders } });
-    const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat, requestOptions: { headers: requestHeaders } });
+    const videoStream = ytdl.downloadFromInfo(info, { format: videoFormat, ...commonOpts });
+    const audioStream = ytdl.downloadFromInfo(info, { format: audioFormat, ...commonOpts });
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
